@@ -1,7 +1,7 @@
-# ============================================================
+﻿# ============================================================
 #  FurniX - One-Command Installer
 # ============================================================
-#  Cai dat:  powershell -c "irm https://raw.githubusercontent.com/tuvotechnical/Furni-X/main/install.ps1 | iex"
+#  Cai dat:  powershell -c "irm https://raw.githubusercontent.com/tuvotechnical/FurniX/main/install.ps1 | iex"
 # ============================================================
 
 $ErrorActionPreference = "Stop"
@@ -15,12 +15,12 @@ $tempZip = "$env:TEMP\FurniX_install.zip"
 
 # --- Banner ---
 Write-Host ""
-Write-Host "  â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—" -ForegroundColor Cyan
-Write-Host "  â•‘                                      â•‘" -ForegroundColor Cyan
-Write-Host "  â•‘        FurniX â€” Installer             â•‘" -ForegroundColor Cyan
-Write-Host "  â•‘   Autodesk Inventor Add-in            â•‘" -ForegroundColor Cyan
-Write-Host "  â•‘                                      â•‘" -ForegroundColor Cyan
-Write-Host "  â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•" -ForegroundColor Cyan
+Write-Host "  ╔══════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "  ║                                      ║" -ForegroundColor Cyan
+Write-Host "  ║        FurniX — Installer             ║" -ForegroundColor Cyan
+Write-Host "  ║   Autodesk Inventor Add-in            ║" -ForegroundColor Cyan
+Write-Host "  ║                                      ║" -ForegroundColor Cyan
+Write-Host "  ╚══════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
 try {
@@ -215,15 +215,15 @@ try {
 
     # --- HOAN TAT ---
     Write-Host ""
-    Write-Host "  â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—" -ForegroundColor Green
-    Write-Host "  â•‘                                      â•‘" -ForegroundColor Green
-    Write-Host "  â•‘   CAI DAT THANH CONG!                â•‘" -ForegroundColor Green
-    Write-Host "  â•‘                                      â•‘" -ForegroundColor Green
-    Write-Host "  â•‘   Khoi dong Inventor de su dung.     â•‘" -ForegroundColor Green
-    Write-Host "  â•‘   Tab 'FurniX' se xuat hien          â•‘" -ForegroundColor Green
-    Write-Host "  â•‘   trong Ribbon khi mo ban ve.        â•‘" -ForegroundColor Green
-    Write-Host "  â•‘                                      â•‘" -ForegroundColor Green
-    Write-Host "  â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•" -ForegroundColor Green
+    Write-Host "  ╔══════════════════════════════════════╗" -ForegroundColor Green
+    Write-Host "  ║                                      ║" -ForegroundColor Green
+    Write-Host "  ║   CAI DAT THANH CONG!                ║" -ForegroundColor Green
+    Write-Host "  ║                                      ║" -ForegroundColor Green
+    Write-Host "  ║   Khoi dong Inventor de su dung.     ║" -ForegroundColor Green
+    Write-Host "  ║   Tab 'FurniX' se xuat hien          ║" -ForegroundColor Green
+    Write-Host "  ║   trong Ribbon khi mo ban ve.        ║" -ForegroundColor Green
+    Write-Host "  ║                                      ║" -ForegroundColor Green
+    Write-Host "  ╚══════════════════════════════════════╝" -ForegroundColor Green
     Write-Host ""
     Write-Host "  Phien ban: $version" -ForegroundColor White
     Write-Host "  Thu muc:   $installPath" -ForegroundColor Gray
