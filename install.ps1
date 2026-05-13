@@ -15,12 +15,10 @@ $tempZip = "$env:TEMP\FurniX_install.zip"
 
 # --- Banner ---
 Write-Host ""
-Write-Host "  ╔══════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "  ║                                      ║" -ForegroundColor Cyan
-Write-Host "  ║        FurniX — Installer             ║" -ForegroundColor Cyan
-Write-Host "  ║   Autodesk Inventor Add-in            ║" -ForegroundColor Cyan
-Write-Host "  ║                                      ║" -ForegroundColor Cyan
-Write-Host "  ╚══════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "  ======================================" -ForegroundColor Cyan
+Write-Host "          FurniX - Installer" -ForegroundColor Cyan
+Write-Host "       Autodesk Inventor Add-in" -ForegroundColor Cyan
+Write-Host "  ======================================" -ForegroundColor Cyan
 Write-Host ""
 
 try {
@@ -166,6 +164,45 @@ try {
     }
     $zip.Dispose()
 
+    # Xac minh material library bat buoc cho Change Material
+    $materialPath = [System.IO.Path]::Combine($installPath, "Materials", "PTC Materials Library.adsklib")
+    if (!(Test-Path $materialPath)) {
+        Write-Host ""
+        Write-Host "  !! THIEU PTC Materials Library sau khi cap nhat." -ForegroundColor Red
+        Write-Host "  !! Hay chay lai update hoac tai ZIP release moi nhat de cai dat thu cong." -ForegroundColor Yellow
+        Write-Host ""
+        return
+    }
+
+    $materialInfo = Get-Item $materialPath
+    if ($materialInfo.Length -lt 1MB) {
+        Write-Host ""
+        Write-Host "  !! PTC Materials Library bi loi hoac tai chua day du: $($materialInfo.Length) bytes." -ForegroundColor Red
+        Write-Host "  !! Hay chay lai update hoac tai ZIP release moi nhat de cai dat thu cong." -ForegroundColor Yellow
+        Write-Host ""
+        return
+    }
+
+    try {
+        $materialZip = [System.IO.Compression.ZipFile]::OpenRead($materialPath)
+        $materialEntryCount = $materialZip.Entries.Count
+        $materialZip.Dispose()
+        if ($materialEntryCount -eq 0) {
+            Write-Host ""
+            Write-Host "  !! PTC Materials Library khong co noi dung hop le." -ForegroundColor Red
+            Write-Host "  !! Hay chay lai update hoac tai ZIP release moi nhat de cai dat thu cong." -ForegroundColor Yellow
+            Write-Host ""
+            return
+        }
+    }
+    catch {
+        Write-Host ""
+        Write-Host "  !! PTC Materials Library khong doc duoc: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  !! Hay chay lai update hoac tai ZIP release moi nhat de cai dat thu cong." -ForegroundColor Yellow
+        Write-Host ""
+        return
+    }
+
     # Xoa file tam
     Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
 
@@ -215,15 +252,12 @@ try {
 
     # --- HOAN TAT ---
     Write-Host ""
-    Write-Host "  ╔══════════════════════════════════════╗" -ForegroundColor Green
-    Write-Host "  ║                                      ║" -ForegroundColor Green
-    Write-Host "  ║   CAI DAT THANH CONG!                ║" -ForegroundColor Green
-    Write-Host "  ║                                      ║" -ForegroundColor Green
-    Write-Host "  ║   Khoi dong Inventor de su dung.     ║" -ForegroundColor Green
-    Write-Host "  ║   Tab 'FurniX' se xuat hien          ║" -ForegroundColor Green
-    Write-Host "  ║   trong Ribbon khi mo ban ve.        ║" -ForegroundColor Green
-    Write-Host "  ║                                      ║" -ForegroundColor Green
-    Write-Host "  ╚══════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host "  ======================================" -ForegroundColor Green
+    Write-Host "       CAI DAT THANH CONG!" -ForegroundColor Green
+    Write-Host "       Khoi dong Inventor de su dung." -ForegroundColor Green
+    Write-Host "       Tab 'FurniX' se xuat hien" -ForegroundColor Green
+    Write-Host "       trong Ribbon khi mo ban ve." -ForegroundColor Green
+    Write-Host "  ======================================" -ForegroundColor Green
     Write-Host ""
     Write-Host "  Phien ban: $version" -ForegroundColor White
     Write-Host "  Thu muc:   $installPath" -ForegroundColor Gray
