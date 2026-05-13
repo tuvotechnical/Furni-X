@@ -1,7 +1,7 @@
-﻿# ============================================================
+# ============================================================
 #  FurniX - One-Command Installer
 # ============================================================
-#  Cai dat:  powershell -c "irm https://raw.githubusercontent.com/tuvotechnical/FurniX/main/install.ps1 | iex"
+#  Cai dat: powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex (((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/tuvotechnical/Furni-X/main/install.ps1')).TrimStart([char]0xFEFF))"
 # ============================================================
 
 $ErrorActionPreference = "Stop"
