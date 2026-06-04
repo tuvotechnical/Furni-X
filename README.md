@@ -10,4 +10,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager
 ```
 
 ## Recovery from v2.1.13
-If Inventor does not load the FurniX tab after updating to v2.1.13, close Inventor and run the same installation command above. It installs the latest release and rewrites `FurniX.addin` with the correct relative DLL path.
+If Inventor does not load the FurniX tab after updating to v2.1.13 or v2.1.14, close Inventor and run the same installation command above. It installs the latest release and rewrites `FurniX.addin` with the absolute DLL path for the current Windows user.

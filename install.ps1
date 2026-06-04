@@ -17,6 +17,8 @@ function Write-FurniXAddinManifest {
     param([string]$TargetPath)
 
     $addinPath = [System.IO.Path]::Combine($TargetPath, "FurniX.addin")
+    $dllPath = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($TargetPath, "FurniX.dll"))
+    $dllPathXml = [System.Security.SecurityElement]::Escape($dllPath)
     $addinLines = @(
         '<?xml version="1.0" encoding="utf-8"?>',
         '<Addin Type="Standard">',
@@ -24,7 +26,7 @@ function Write-FurniXAddinManifest {
         '  <ClientId>{24E2795D-CC26-4F30-A3FA-FB4217E8D710}</ClientId>',
         '  <DisplayName>FurniX</DisplayName>',
         '  <Description>FurniX Add-in for Autodesk Inventor</Description>',
-        '  <Assembly>.\FurniX.dll</Assembly>',
+        "  <Assembly>$dllPathXml</Assembly>",
         '  <AddinType>Standard</AddinType>',
         '  <LoadOnStartUp>1</LoadOnStartUp>',
         '  <UserUnloadable>1</UserUnloadable>',
