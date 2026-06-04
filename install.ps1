@@ -13,6 +13,32 @@ $installPath = "$env:AppData\Autodesk\ApplicationPlugins\FurniX"
 $apiUrl = "https://api.github.com/repos/$repoOwner/$repoName/releases/latest"
 $tempZip = "$env:TEMP\FurniX_install.zip"
 
+function Write-FurniXAddinManifest {
+    param([string]$TargetPath)
+
+    $addinPath = [System.IO.Path]::Combine($TargetPath, "FurniX.addin")
+    $addinLines = @(
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<Addin Type="Standard">',
+        '  <ClassId>{24E2795D-CC26-4F30-A3FA-FB4217E8D710}</ClassId>',
+        '  <ClientId>{24E2795D-CC26-4F30-A3FA-FB4217E8D710}</ClientId>',
+        '  <DisplayName>FurniX</DisplayName>',
+        '  <Description>FurniX Add-in for Autodesk Inventor</Description>',
+        '  <Assembly>.\FurniX.dll</Assembly>',
+        '  <AddinType>Standard</AddinType>',
+        '  <LoadOnStartUp>1</LoadOnStartUp>',
+        '  <UserUnloadable>1</UserUnloadable>',
+        '  <Hidden>0</Hidden>',
+        '  <SupportedSoftwareVersionGreaterThan>16..</SupportedSoftwareVersionGreaterThan>',
+        '</Addin>'
+    )
+
+    [System.IO.File]::WriteAllText(
+        $addinPath,
+        ($addinLines -join "`r`n"),
+        [System.Text.Encoding]::UTF8)
+}
+
 # --- Banner ---
 Write-Host ""
 Write-Host "  ======================================" -ForegroundColor Cyan
@@ -163,6 +189,9 @@ try {
         }
     }
     $zip.Dispose()
+
+    Write-FurniXAddinManifest $installPath
+    Write-Host "  -> Da cap nhat FurniX.addin theo thu muc cai dat." -ForegroundColor Green
 
     # Xac minh material library bat buoc cho Change Material
     $materialPath = [System.IO.Path]::Combine($installPath, "Materials", "PTC Materials Library.adsklib")

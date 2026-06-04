@@ -8,3 +8,6 @@ Run the following command in PowerShell:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex (((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/tuvotechnical/Furni-X/main/install.ps1')).TrimStart([char]0xFEFF))"
 ```
+
+## Recovery from v2.1.13
+If Inventor does not load the FurniX tab after updating to v2.1.13, close Inventor and run the same installation command above. It installs the latest release and rewrites `FurniX.addin` with the correct relative DLL path.
