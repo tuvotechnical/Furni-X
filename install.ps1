@@ -12,6 +12,70 @@ $repoName = "Furni-X"
 $installPath = "$env:AppData\Autodesk\ApplicationPlugins\FurniX"
 $apiUrl = "https://api.github.com/repos/$repoOwner/$repoName/releases/latest"
 $tempZip = "$env:TEMP\FurniX_install.zip"
+$furniXAddinClassId = "24E2795D-CC26-4F30-A3FA-FB4217E8D710"
+
+function Get-FurniXAddinScanRoots {
+    $roots = New-Object System.Collections.Generic.List[string]
+    $roots.Add([System.IO.Path]::Combine($env:AppData, "Autodesk", "ApplicationPlugins"))
+    $roots.Add([System.IO.Path]::Combine($env:ProgramData, "Autodesk", "ApplicationPlugins"))
+    $roots.Add([System.IO.Path]::Combine($env:ProgramData, "Autodesk", "Inventor Addins"))
+
+    foreach ($basePath in @(
+        [System.IO.Path]::Combine($env:AppData, "Autodesk"),
+        [System.IO.Path]::Combine($env:ProgramData, "Autodesk")
+    )) {
+        if (!(Test-Path $basePath)) { continue }
+        Get-ChildItem -Path $basePath -Directory -Filter "Inventor *" -ErrorAction SilentlyContinue | ForEach-Object {
+            $roots.Add([System.IO.Path]::Combine($_.FullName, "Addins"))
+        }
+    }
+
+    return $roots | Where-Object { ![string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+}
+
+function Disable-DuplicateFurniXAddinManifests {
+    param([string]$CanonicalAddinPath)
+
+    $canonicalFullPath = [System.IO.Path]::GetFullPath($CanonicalAddinPath)
+    $failures = New-Object System.Collections.Generic.List[string]
+    foreach ($root in Get-FurniXAddinScanRoots) {
+        if (!(Test-Path $root)) { continue }
+        Get-ChildItem -Path $root -Filter "*.addin" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            $addinPath = $_.FullName
+            try {
+                $fullPath = [System.IO.Path]::GetFullPath($addinPath)
+                $content = Get-Content -Path $fullPath -Raw -ErrorAction Stop
+            }
+            catch {
+                return
+            }
+            if ([string]::Equals($fullPath, $canonicalFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return
+            }
+            if ($content.IndexOf($furniXAddinClassId, [System.StringComparison]::OrdinalIgnoreCase) -lt 0 -and
+                $content.IndexOf("<DisplayName>FurniX</DisplayName>", [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+                return
+            }
+            try {
+                $disabledPath = $fullPath + ".disabled"
+                if (Test-Path $disabledPath) {
+                    $disabledPath = $fullPath + ".disabled." + (Get-Date -Format "yyyyMMddHHmmss")
+                }
+                Rename-Item -LiteralPath $fullPath -NewName ([System.IO.Path]::GetFileName($disabledPath)) -Force -ErrorAction Stop
+                Write-Host "  -> Da disable manifest FurniX trung lap: $fullPath" -ForegroundColor Yellow
+            }
+            catch {
+                $failures.Add($fullPath)
+                Write-Host "  WARN: Khong the disable manifest FurniX trung lap: $addinPath" -ForegroundColor Yellow
+                Write-Host "        $($_.Exception.Message)" -ForegroundColor DarkYellow
+            }
+        }
+    }
+
+    if ($failures.Count -gt 0) {
+        throw "Khong the disable manifest FurniX trung lap. Hay mo PowerShell bang Run as Administrator va chay lai: $($failures -join '; ')"
+    }
+}
 
 function Write-FurniXAddinManifest {
     param([string]$TargetPath)
@@ -27,14 +91,18 @@ function Write-FurniXAddinManifest {
         '  <DisplayName>FurniX</DisplayName>',
         '  <Description>FurniX Add-in for Autodesk Inventor</Description>',
         "  <Assembly>$dllPathXml</Assembly>",
-        '  <AddinType>Standard</AddinType>',
-        '  <LoadOnStartUp>1</LoadOnStartUp>',
+        '  <OSType>Win64</OSType>',
+        '  <LoadAutomatically>1</LoadAutomatically>',
         '  <UserUnloadable>1</UserUnloadable>',
         '  <Hidden>0</Hidden>',
         '  <SupportedSoftwareVersionGreaterThan>16..</SupportedSoftwareVersionGreaterThan>',
+        '  <DataVersion>1</DataVersion>',
+        '  <LoadBehavior>0</LoadBehavior>',
+        '  <UserInterfaceVersion>2</UserInterfaceVersion>',
         '</Addin>'
     )
 
+    Disable-DuplicateFurniXAddinManifests $addinPath
     [System.IO.File]::WriteAllText(
         $addinPath,
         ($addinLines -join "`r`n"),
