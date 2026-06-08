@@ -9,7 +9,7 @@ Run the following command in PowerShell:
 powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex (((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/tuvotechnical/Furni-X/main/install.ps1')).TrimStart([char]0xFEFF))"
 ```
 
-## Recovery from v2.1.13-v2.1.15
-If Inventor does not load the FurniX tab, close Inventor and run the same installation command above. The installer disables duplicate FurniX manifests from other Inventor add-in folders, installs the latest release, and writes one canonical `FurniX.addin` with the absolute DLL path for the current Windows user.
+## Recovery from v2.1.13-v2.1.16
+If Inventor does not load the FurniX tab, close Inventor and run the same installation command above. The installer disables duplicate FurniX manifests from other Inventor add-in folders, resets the per-user Inventor `AddInLoadRules` block cache, unblocks downloaded files, installs the latest release, and writes one canonical `FurniX.addin` with the absolute DLL path.
 
-If the installer reports that a duplicate manifest cannot be disabled, run PowerShell as Administrator and execute the command again.
+For the strongest repair, run PowerShell as Administrator and execute the command again. In that mode the installer uses `%ProgramData%\Autodesk\Inventor Addins\FurniX`, writes the canonical manifest to `%ProgramData%\Autodesk\Inventor Addins\FurniX.addin`, and adds a FurniX trusted path to Inventor's administrator load rules.

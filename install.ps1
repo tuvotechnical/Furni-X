@@ -10,9 +10,43 @@ $ErrorActionPreference = "Stop"
 $repoOwner = "tuvotechnical"
 $repoName = "Furni-X"
 $installPath = "$env:AppData\Autodesk\ApplicationPlugins\FurniX"
+$addinManifestPath = [System.IO.Path]::Combine($installPath, "FurniX.addin")
+$installMode = "Current User"
 $apiUrl = "https://api.github.com/repos/$repoOwner/$repoName/releases/latest"
 $tempZip = "$env:TEMP\FurniX_install.zip"
 $furniXAddinClassId = "24E2795D-CC26-4F30-A3FA-FB4217E8D710"
+
+function Test-FurniXIsAdministrator {
+    try {
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+        return $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-FurniXInstallContext {
+    $userInstallPath = [System.IO.Path]::Combine($env:AppData, "Autodesk", "ApplicationPlugins", "FurniX")
+    $context = New-Object PSObject -Property @{
+        InstallPath = $userInstallPath
+        AddinPath = [System.IO.Path]::Combine($userInstallPath, "FurniX.addin")
+        Mode = "Current User"
+        IsAllUsers = $false
+    }
+
+    if (Test-FurniXIsAdministrator) {
+        $allUsersAddins = [System.IO.Path]::Combine($env:ProgramData, "Autodesk", "Inventor Addins")
+        $allUsersInstallPath = [System.IO.Path]::Combine($allUsersAddins, "FurniX")
+        $context.InstallPath = $allUsersInstallPath
+        $context.AddinPath = [System.IO.Path]::Combine($allUsersAddins, "FurniX.addin")
+        $context.Mode = "All Users"
+        $context.IsAllUsers = $true
+    }
+
+    return $context
+}
 
 function Get-FurniXAddinScanRoots {
     $roots = New-Object System.Collections.Generic.List[string]
@@ -31,6 +65,130 @@ function Get-FurniXAddinScanRoots {
     }
 
     return $roots | Where-Object { ![string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+}
+
+function Reset-FurniXUserAddInLoadRules {
+    $backupStamp = Get-Date -Format "yyyyMMddHHmmss"
+    $autodeskRoot = [System.IO.Path]::Combine($env:AppData, "Autodesk")
+    if (!(Test-Path $autodeskRoot)) { return 0 }
+
+    $resetCount = 0
+    Get-ChildItem -Path $autodeskRoot -Directory -Filter "Inventor *" -ErrorAction SilentlyContinue | ForEach-Object {
+        $rulesPath = [System.IO.Path]::Combine($_.FullName, "Addins", "AddInLoadRules")
+        if (!(Test-Path $rulesPath)) { return }
+
+        try {
+            $backupPath = $rulesPath + ".FurniXBackup." + $backupStamp
+            if (Test-Path $backupPath) {
+                $backupPath = $rulesPath + ".FurniXBackup." + $backupStamp + "." + ([System.Guid]::NewGuid().ToString("N"))
+            }
+            Rename-Item -LiteralPath $rulesPath -NewName ([System.IO.Path]::GetFileName($backupPath)) -Force -ErrorAction Stop
+            $resetCount = $resetCount + 1
+            Write-Host "  -> Da reset cache block/allow cua Inventor: $rulesPath" -ForegroundColor Yellow
+        }
+        catch {
+            Write-Host "  WARN: Khong the reset AddInLoadRules: $rulesPath" -ForegroundColor Yellow
+            Write-Host "        $($_.Exception.Message)" -ForegroundColor DarkYellow
+        }
+    }
+
+    return $resetCount
+}
+
+function Get-FurniXInventorPreferenceRuleFiles {
+    $paths = New-Object System.Collections.Generic.List[string]
+
+    foreach ($registryRoot in @(
+        "HKLM:\SOFTWARE\Autodesk\Inventor",
+        "HKLM:\SOFTWARE\WOW6432Node\Autodesk\Inventor"
+    )) {
+        if (!(Test-Path $registryRoot)) { continue }
+        Get-ChildItem -Path $registryRoot -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $props = Get-ItemProperty -Path $_.PSPath -ErrorAction Stop
+                $inventorLocation = $props.InventorLocation
+                if ([string]::IsNullOrWhiteSpace($inventorLocation)) { return }
+
+                $binDir = [System.IO.Path]::GetFullPath($inventorLocation)
+                $installRoot = [System.IO.Directory]::GetParent($binDir.TrimEnd('\')).FullName
+                $rulesPath = [System.IO.Path]::Combine($installRoot, "Preferences", "AddInLoadRules.xml")
+                if (Test-Path $rulesPath) {
+                    $paths.Add($rulesPath)
+                }
+            }
+            catch {
+            }
+        }
+    }
+
+    $programFilesAutodesk = [System.IO.Path]::Combine($env:ProgramFiles, "Autodesk")
+    if (Test-Path $programFilesAutodesk) {
+        Get-ChildItem -Path $programFilesAutodesk -Directory -Filter "Inventor *" -ErrorAction SilentlyContinue | ForEach-Object {
+            $rulesPath = [System.IO.Path]::Combine($_.FullName, "Preferences", "AddInLoadRules.xml")
+            if (Test-Path $rulesPath) {
+                $paths.Add($rulesPath)
+            }
+        }
+    }
+
+    return $paths | Where-Object { ![string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+}
+
+function Update-FurniXInventorTrustedPathRules {
+    param([string]$TrustedPath)
+
+    if ([string]::IsNullOrWhiteSpace($TrustedPath)) { return 0 }
+    if (!(Test-FurniXIsAdministrator)) { return 0 }
+
+    $normalizedTrustedPath = [System.IO.Path]::GetFullPath($TrustedPath).TrimEnd('\') + "\"
+    $updatedCount = 0
+    foreach ($rulesPath in Get-FurniXInventorPreferenceRuleFiles) {
+        try {
+            [xml]$xml = Get-Content -Path $rulesPath -Raw -ErrorAction Stop
+            if ($xml.AddInLoadRules -eq $null) { continue }
+
+            $alreadyAllowed = $false
+            foreach ($node in $xml.AddInLoadRules.TrustedPath) {
+                if ($node -eq $null) { continue }
+                $policy = $node.Policy
+                $value = [string]$node.InnerText
+                if ([string]::Equals($policy, "Allow", [System.StringComparison]::OrdinalIgnoreCase) -and
+                    [string]::Equals($value.TrimEnd('\') + "\", $normalizedTrustedPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $alreadyAllowed = $true
+                    break
+                }
+            }
+
+            if ($alreadyAllowed) { continue }
+
+            $backupPath = $rulesPath + ".FurniXBackup." + (Get-Date -Format "yyyyMMddHHmmss")
+            Copy-Item -LiteralPath $rulesPath -Destination $backupPath -Force -ErrorAction Stop
+
+            $trustedNode = $xml.CreateElement("TrustedPath")
+            $policyAttribute = $xml.CreateAttribute("Policy")
+            $policyAttribute.Value = "Allow"
+            [void]$trustedNode.Attributes.Append($policyAttribute)
+            $trustedNode.InnerText = $normalizedTrustedPath
+
+            $fallbackNode = $xml.AddInLoadRules.SelectSingleNode("Fallback")
+            if ($fallbackNode -ne $null) {
+                [void]$xml.AddInLoadRules.InsertBefore($trustedNode, $fallbackNode)
+            }
+            else {
+                [void]$xml.AddInLoadRules.AppendChild($trustedNode)
+            }
+
+            $xml.Save($rulesPath)
+            $updatedCount = $updatedCount + 1
+            Write-Host "  -> Da them TrustedPath FurniX vao: $rulesPath" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "  WARN: Khong the cap nhat AddInLoadRules.xml: $rulesPath" -ForegroundColor Yellow
+            Write-Host "        $($_.Exception.Message)" -ForegroundColor DarkYellow
+        }
+    }
+
+    return $updatedCount
 }
 
 function Disable-DuplicateFurniXAddinManifests {
@@ -78,9 +236,14 @@ function Disable-DuplicateFurniXAddinManifests {
 }
 
 function Write-FurniXAddinManifest {
-    param([string]$TargetPath)
+    param(
+        [string]$TargetPath,
+        [string]$AddinPath
+    )
 
-    $addinPath = [System.IO.Path]::Combine($TargetPath, "FurniX.addin")
+    if ([string]::IsNullOrWhiteSpace($AddinPath)) {
+        $AddinPath = [System.IO.Path]::Combine($TargetPath, "FurniX.addin")
+    }
     $dllPath = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($TargetPath, "FurniX.dll"))
     $dllPathXml = [System.Security.SecurityElement]::Escape($dllPath)
     $addinLines = @(
@@ -102,9 +265,13 @@ function Write-FurniXAddinManifest {
         '</Addin>'
     )
 
-    Disable-DuplicateFurniXAddinManifests $addinPath
+    Disable-DuplicateFurniXAddinManifests $AddinPath
+    $addinDir = [System.IO.Path]::GetDirectoryName($AddinPath)
+    if (!(Test-Path $addinDir)) {
+        New-Item -ItemType Directory -Path $addinDir -Force | Out-Null
+    }
     [System.IO.File]::WriteAllText(
-        $addinPath,
+        $AddinPath,
         ($addinLines -join "`r`n"),
         [System.Text.Encoding]::UTF8)
 }
@@ -116,6 +283,11 @@ Write-Host "          FurniX - Installer" -ForegroundColor Cyan
 Write-Host "       Autodesk Inventor Add-in" -ForegroundColor Cyan
 Write-Host "  ======================================" -ForegroundColor Cyan
 Write-Host ""
+
+$installContext = Get-FurniXInstallContext
+$installPath = $installContext.InstallPath
+$addinManifestPath = $installContext.AddinPath
+$installMode = $installContext.Mode
 
 try {
     # --- STEP 1: Lay thong tin release moi nhat ---
@@ -143,6 +315,9 @@ try {
 
     Write-Host "  -> Phien ban: $releaseName ($version)" -ForegroundColor Green
     Write-Host "  -> File:      $fileName ($fileSize KB)" -ForegroundColor Gray
+    Write-Host "  -> Che do:    $installMode" -ForegroundColor Gray
+    Write-Host "  -> Thu muc:   $installPath" -ForegroundColor Gray
+    Write-Host "  -> Manifest:  $addinManifestPath" -ForegroundColor Gray
 
     $inventorWasRunning = $false
     if (Get-Process -Name "Inventor" -ErrorAction SilentlyContinue) {
@@ -260,7 +435,17 @@ try {
     }
     $zip.Dispose()
 
-    Write-FurniXAddinManifest $installPath
+    $trustedRuleCount = Update-FurniXInventorTrustedPathRules $installPath
+    if ($installContext.IsAllUsers -and $trustedRuleCount -eq 0) {
+        Write-Host "  -> TrustedPath FurniX da co san hoac khong tim thay rule file can sua." -ForegroundColor Gray
+    }
+
+    $resetRuleCount = Reset-FurniXUserAddInLoadRules
+    if ($resetRuleCount -eq 0) {
+        Write-Host "  -> Khong co cache AddInLoadRules theo user can reset." -ForegroundColor Gray
+    }
+
+    Write-FurniXAddinManifest $installPath $addinManifestPath
     Write-Host "  -> Da cap nhat FurniX.addin theo thu muc cai dat." -ForegroundColor Green
 
     # Xac minh material library bat buoc cho Change Material
@@ -336,6 +521,9 @@ try {
     # --- STEP 6: Unblock files ---
     Write-Host "  [6/6] Mo khoa file (Unblock)..." -ForegroundColor Yellow
     Get-ChildItem -Path $installPath -Recurse | Unblock-File -ErrorAction SilentlyContinue
+    if (Test-Path $addinManifestPath) {
+        Unblock-File -Path $addinManifestPath -ErrorAction SilentlyContinue
+    }
     Write-Host "  -> Hoan tat." -ForegroundColor Green
 
     # --- STEP 7: Tu dong mo lai Inventor ---
@@ -360,6 +548,7 @@ try {
     Write-Host ""
     Write-Host "  Phien ban: $version" -ForegroundColor White
     Write-Host "  Thu muc:   $installPath" -ForegroundColor Gray
+    Write-Host "  Manifest:  $addinManifestPath" -ForegroundColor Gray
     Write-Host "  GitHub:    https://github.com/$repoOwner/$repoName" -ForegroundColor Cyan
     Write-Host ""
 }
@@ -371,7 +560,8 @@ catch {
     Write-Host "  1. DONG HOAN TOAN Inventor truoc." -ForegroundColor White
     Write-Host "  2. Tai file ZIP tu: https://github.com/$repoOwner/$repoName/releases/latest" -ForegroundColor White
     Write-Host "  3. Giai nen vao: $installPath" -ForegroundColor White
-    Write-Host "  4. Khoi dong lai Inventor." -ForegroundColor White
+    Write-Host "  4. Dam bao manifest FurniX.addin tro toi FurniX.dll trong thu muc tren." -ForegroundColor White
+    Write-Host "  5. Khoi dong lai Inventor." -ForegroundColor White
     Write-Host ""
 
     # Don dep file tam
