@@ -27,6 +27,25 @@ function Test-FurniXIsAdministrator {
     }
 }
 
+function Get-FurniXUserInventorAddinFolders {
+    $autodeskRoot = [System.IO.Path]::Combine($env:AppData, "Autodesk")
+    $folders = New-Object System.Collections.Generic.List[string]
+
+    if (Test-Path $autodeskRoot) {
+        Get-ChildItem -Path $autodeskRoot -Directory -Filter "Inventor *" -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($_.Name -match "^Inventor\s+\d{4}$") {
+                $folders.Add([System.IO.Path]::Combine($_.FullName, "Addins"))
+            }
+        }
+    }
+
+    if ($folders.Count -eq 0) {
+        $folders.Add([System.IO.Path]::Combine($autodeskRoot, "Inventor 2023", "Addins"))
+    }
+
+    return $folders
+}
+
 function Get-FurniXInstallContext {
     $userInstallPath = [System.IO.Path]::Combine($env:AppData, "Autodesk", "ApplicationPlugins", "FurniX")
     $context = New-Object PSObject -Property @{
@@ -231,19 +250,20 @@ function Disable-DuplicateFurniXAddinManifests {
     }
 
     if ($failures.Count -gt 0) {
-        throw "Khong the disable manifest FurniX trung lap. Hay mo PowerShell bang Run as Administrator va chay lai: $($failures -join '; ')"
+        if (Test-FurniXIsAdministrator) {
+            throw "Khong the disable manifest FurniX trung lap. Hay mo PowerShell bang Run as Administrator va chay lai: $($failures -join '; ')"
+        }
+
+        Write-Host "  WARN: Khong the disable mot so manifest FurniX trung lap vi khong co quyen admin:" -ForegroundColor Yellow
+        foreach ($failure in $failures) {
+            Write-Host "        $failure" -ForegroundColor DarkYellow
+        }
     }
 }
 
-function Write-FurniXAddinManifest {
-    param(
-        [string]$TargetPath,
-        [string]$AddinPath
-    )
+function New-FurniXAddinManifestText {
+    param([string]$TargetPath)
 
-    if ([string]::IsNullOrWhiteSpace($AddinPath)) {
-        $AddinPath = [System.IO.Path]::Combine($TargetPath, "FurniX.addin")
-    }
     $dllPath = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($TargetPath, "FurniX.dll"))
     $dllPathXml = [System.Security.SecurityElement]::Escape($dllPath)
     $addinLines = @(
@@ -265,6 +285,18 @@ function Write-FurniXAddinManifest {
         '</Addin>'
     )
 
+    return ($addinLines -join "`r`n")
+}
+
+function Write-FurniXAddinManifest {
+    param(
+        [string]$TargetPath,
+        [string]$AddinPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($AddinPath)) {
+        $AddinPath = [System.IO.Path]::Combine($TargetPath, "FurniX.addin")
+    }
     Disable-DuplicateFurniXAddinManifests $AddinPath
     $addinDir = [System.IO.Path]::GetDirectoryName($AddinPath)
     if (!(Test-Path $addinDir)) {
@@ -272,8 +304,34 @@ function Write-FurniXAddinManifest {
     }
     [System.IO.File]::WriteAllText(
         $AddinPath,
-        ($addinLines -join "`r`n"),
+        (New-FurniXAddinManifestText $TargetPath),
         [System.Text.Encoding]::UTF8)
+}
+
+function Write-FurniXUserInventorAddinManifests {
+    param([string]$TargetPath)
+
+    $folders = @(Get-FurniXUserInventorAddinFolders)
+    if ($folders.Count -eq 0) { return 0 }
+
+    $canonicalAddinPath = [System.IO.Path]::Combine($folders[0], "FurniX.addin")
+    Disable-DuplicateFurniXAddinManifests $canonicalAddinPath
+
+    $manifestText = New-FurniXAddinManifestText $TargetPath
+    $count = 0
+    foreach ($folder in $folders) {
+        if (!(Test-Path $folder)) {
+            New-Item -ItemType Directory -Path $folder -Force | Out-Null
+        }
+
+        $manifestPath = [System.IO.Path]::Combine($folder, "FurniX.addin")
+        [System.IO.File]::WriteAllText($manifestPath, $manifestText, [System.Text.Encoding]::UTF8)
+        Unblock-File -Path $manifestPath -ErrorAction SilentlyContinue
+        $count = $count + 1
+        Write-Host "  -> Da cap nhat manifest Inventor: $manifestPath" -ForegroundColor Green
+    }
+
+    return $count
 }
 
 # --- Banner ---
@@ -445,8 +503,19 @@ try {
         Write-Host "  -> Khong co cache AddInLoadRules theo user can reset." -ForegroundColor Gray
     }
 
-    Write-FurniXAddinManifest $installPath $addinManifestPath
-    Write-Host "  -> Da cap nhat FurniX.addin theo thu muc cai dat." -ForegroundColor Green
+    if ($installContext.IsAllUsers) {
+        Write-FurniXAddinManifest $installPath $addinManifestPath
+        Write-Host "  -> Da cap nhat FurniX.addin theo thu muc cai dat." -ForegroundColor Green
+    } else {
+        $packageManifestPath = [System.IO.Path]::Combine($installPath, "FurniX.addin")
+        if (Test-Path $packageManifestPath) {
+            Remove-Item -LiteralPath $packageManifestPath -Force -ErrorAction SilentlyContinue
+            Write-Host "  -> Da xoa manifest package de tranh trung lap: $packageManifestPath" -ForegroundColor Gray
+        }
+
+        $manifestCount = Write-FurniXUserInventorAddinManifests $installPath
+        Write-Host "  -> Da cap nhat $manifestCount manifest user-level trong Inventor Addins." -ForegroundColor Green
+    }
 
     # Xac minh material library bat buoc cho Change Material
     $materialPath = [System.IO.Path]::Combine($installPath, "Materials", "PTC Materials Library.adsklib")

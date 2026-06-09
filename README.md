@@ -9,7 +9,9 @@ Run the following command in PowerShell:
 powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex (((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/tuvotechnical/Furni-X/main/install.ps1')).TrimStart([char]0xFEFF))"
 ```
 
-## Recovery from v2.1.13-v2.1.16
-If Inventor does not load the FurniX tab, close Inventor and run the same installation command above. The installer disables duplicate FurniX manifests from other Inventor add-in folders, resets the per-user Inventor `AddInLoadRules` block cache, unblocks downloaded files, installs the latest release, and writes one canonical `FurniX.addin` with the absolute DLL path.
+## Recovery from v2.1.13-v2.1.17
+If Inventor does not load the FurniX tab, close Inventor and run the same installation command above in a normal PowerShell window. Administrator rights are not required.
 
-For the strongest repair, run PowerShell as Administrator and execute the command again. In that mode the installer uses `%ProgramData%\Autodesk\Inventor Addins\FurniX`, writes the canonical manifest to `%ProgramData%\Autodesk\Inventor Addins\FurniX.addin`, and adds a FurniX trusted path to Inventor's administrator load rules.
+The installer disables duplicate FurniX manifests where permitted, resets the per-user Inventor `AddInLoadRules` cache, unblocks downloaded files, installs the latest release, removes the duplicate package manifest, and writes an active manifest to `%AppData%\Autodesk\Inventor 20xx\Addins` with the absolute path to `FurniX.dll`.
+
+Version 2.1.18 also restores the required `FurniX.AutoCAD.dll`, `Autodesk.Inventor.Interop.dll`, and `stdole.dll` files in the release package.
