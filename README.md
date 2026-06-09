@@ -14,4 +14,6 @@ If Inventor does not load the FurniX tab, close Inventor and run the same instal
 
 The installer disables duplicate FurniX manifests where permitted, resets the per-user Inventor `AddInLoadRules` cache, unblocks downloaded files, installs the latest release, removes the duplicate package manifest, and writes an active manifest to `%AppData%\Autodesk\Inventor 20xx\Addins` with the absolute path to `FurniX.dll`.
 
-Version 2.1.18 also restores the required `FurniX.AutoCAD.dll`, `Autodesk.Inventor.Interop.dll`, and `stdole.dll` files in the release package.
+Version 2.1.18 restores the required `FurniX.AutoCAD.dll`, `Autodesk.Inventor.Interop.dll`, and `stdole.dll` files in the release package.
+
+Version 2.1.19 adds an AutoCAD 2024 compatibility plugin, retries installed AutoCAD Core Console versions, and verifies that the merged DWG was actually created. Autodesk `accoremgd.dll` and `acdbmgd.dll` are intentionally not packaged because Core Console must load the matching files from the user's AutoCAD installation.
