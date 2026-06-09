@@ -27,6 +27,27 @@ function Test-FurniXIsAdministrator {
     }
 }
 
+function Remove-FurniXZoneIdentifier {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+
+    try {
+        Unblock-File -LiteralPath $Path -ErrorAction SilentlyContinue
+    }
+    catch {
+    }
+
+    $streamPath = $Path + ":Zone.Identifier"
+    try {
+        [System.IO.File]::Delete($streamPath)
+    }
+    catch {
+    }
+
+    return !(Test-Path -LiteralPath $streamPath)
+}
+
 function Get-FurniXUserInventorAddinFolders {
     $autodeskRoot = [System.IO.Path]::Combine($env:AppData, "Autodesk")
     $folders = New-Object System.Collections.Generic.List[string]
@@ -589,9 +610,11 @@ try {
 
     # --- STEP 6: Unblock files ---
     Write-Host "  [6/6] Mo khoa file (Unblock)..." -ForegroundColor Yellow
-    Get-ChildItem -Path $installPath -Recurse | Unblock-File -ErrorAction SilentlyContinue
+    Get-ChildItem -Path $installPath -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+        [void](Remove-FurniXZoneIdentifier $_.FullName)
+    }
     if (Test-Path $addinManifestPath) {
-        Unblock-File -Path $addinManifestPath -ErrorAction SilentlyContinue
+        [void](Remove-FurniXZoneIdentifier $addinManifestPath)
     }
     Write-Host "  -> Hoan tat." -ForegroundColor Green
 
