@@ -21,3 +21,5 @@ Version 2.1.19 adds an AutoCAD 2024 compatibility plugin, retries installed Auto
 Version 2.1.20 fixes AutoCAD `NETLOAD` error `0x80131515`. FurniX now copies its AutoCAD plugins into `%LocalAppData%\FurniX\AutoCAD` using a clean byte stream before loading them, which removes Mark-of-the-Web without requiring administrator rights or changes to AutoCAD/.NET configuration.
 
 Version 2.1.29 preserves the Loaded/Unloaded state of every Inventor add-in during install and update. It also makes `0Harmony.dll` optional on Inventor 2023 while continuing to package it for the .NET 8 hotfix used by Inventor 2025+.
+
+Version 2.1.30 fixes Hardware Library command routing: Place, Replace, and Replace All now call their separate native Inventor commands, so Replace All replaces every matching occurrence instead of behaving like Replace/Place.
