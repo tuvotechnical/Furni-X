@@ -107,34 +107,6 @@ function Get-FurniXAddinScanRoots {
     return $roots | Where-Object { ![string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 }
 
-function Reset-FurniXUserAddInLoadRules {
-    $backupStamp = Get-Date -Format "yyyyMMddHHmmss"
-    $autodeskRoot = [System.IO.Path]::Combine($env:AppData, "Autodesk")
-    if (!(Test-Path $autodeskRoot)) { return 0 }
-
-    $resetCount = 0
-    Get-ChildItem -Path $autodeskRoot -Directory -Filter "Inventor *" -ErrorAction SilentlyContinue | ForEach-Object {
-        $rulesPath = [System.IO.Path]::Combine($_.FullName, "Addins", "AddInLoadRules")
-        if (!(Test-Path $rulesPath)) { return }
-
-        try {
-            $backupPath = $rulesPath + ".FurniXBackup." + $backupStamp
-            if (Test-Path $backupPath) {
-                $backupPath = $rulesPath + ".FurniXBackup." + $backupStamp + "." + ([System.Guid]::NewGuid().ToString("N"))
-            }
-            Rename-Item -LiteralPath $rulesPath -NewName ([System.IO.Path]::GetFileName($backupPath)) -Force -ErrorAction Stop
-            $resetCount = $resetCount + 1
-            Write-Host "  -> Da reset cache block/allow cua Inventor: $rulesPath" -ForegroundColor Yellow
-        }
-        catch {
-            Write-Host "  WARN: Khong the reset AddInLoadRules: $rulesPath" -ForegroundColor Yellow
-            Write-Host "        $($_.Exception.Message)" -ForegroundColor DarkYellow
-        }
-    }
-
-    return $resetCount
-}
-
 function Get-FurniXInventorPreferenceRuleFiles {
     $paths = New-Object System.Collections.Generic.List[string]
 
@@ -519,10 +491,10 @@ try {
         Write-Host "  -> TrustedPath FurniX da co san hoac khong tim thay rule file can sua." -ForegroundColor Gray
     }
 
-    $resetRuleCount = Reset-FurniXUserAddInLoadRules
-    if ($resetRuleCount -eq 0) {
-        Write-Host "  -> Khong co cache AddInLoadRules theo user can reset." -ForegroundColor Gray
-    }
+    # AddInLoadRules contains the user's Loaded/Unloaded choices for every
+    # Inventor add-in. Never rename, delete, or regenerate this shared file
+    # while installing FurniX. Updating the FurniX manifest is sufficient.
+    Write-Host "  -> Giu nguyen AddInLoadRules va trang thai cac add-in khac." -ForegroundColor Gray
 
     if ($installContext.IsAllUsers) {
         Write-FurniXAddinManifest $installPath $addinManifestPath
